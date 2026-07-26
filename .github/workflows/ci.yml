@@ -1,9 +1,15 @@
-name: CI
+name: CICD-Learning
 
 on:
   pull_request:
+    branches:
+      - main
+
   push:
-    branches: [main]
+    branches:
+      - main
+
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,11 +20,12 @@ concurrency:
 
 jobs:
   validate:
+    name: Validate affected projects
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Checkout
+      - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -35,14 +42,14 @@ jobs:
       - name: Set Nx comparison SHAs
         uses: nrwl/nx-set-shas@v4
 
-      - name: Validate affected projects
-        run: npx nx affected -t lint test build --parallel=3
+      - name: Show affected projects
+        run: npx nx show projects --affected
 
-      - name: Upload build artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: dist/
-          if-no-files-found: error
-          retention-days: 7
+      - name: Lint affected projects
+        run: npx nx affected -t lint --parallel=3
+
+      - name: Test affected projects
+        run: npx nx affected -t test --parallel=3
+
+      - name: Build affected projects
+        run: npx nx affected -t build --parallel=3
