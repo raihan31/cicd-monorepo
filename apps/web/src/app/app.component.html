@@ -1,0 +1,20 @@
+<main class="container">
+  <p class="eyebrow">NX · ANGULAR · NESTJS</p>
+  <h1>CI/CD Learning Monorepo</h1>
+  <p class="intro">One repository, two deployable applications, and a shared contract library.</p>
+
+  @if (loading()) {
+    <p class="status">Loading products...</p>
+  } @else if (error()) {
+    <p class="status error">{{ error() }}</p>
+  } @else {
+    <section class="grid" aria-label="Products">
+      @for (product of products(); track product.id) {
+        <article class="card">
+          <h2>{{ product.name }}</h2>
+          <p>{{ product.price | currency }}</p>
+        </article>
+      }
+    </section>
+  }
+</main>
