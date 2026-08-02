@@ -14,7 +14,12 @@
     "build": "nx run-many -t build",
     "validate": "nx run-many -t lint test build",
     "affected": "nx affected -t lint test build",
-    "graph": "nx graph"
+    "graph": "nx graph",
+    "affected:list": "nx show projects --affected",
+    "affected:lint": "nx affected -t lint",
+    "affected:test": "nx affected -t test",
+    "affected:build": "nx affected -t build",
+    "affected:validate": "nx affected -t lint test build"
   },
   "dependencies": {
     "@angular/common": "^22.0.8",
