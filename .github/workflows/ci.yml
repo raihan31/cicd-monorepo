@@ -53,3 +53,6 @@ jobs:
 
       - name: Build affected projects
         run: npx nx affected -t build --parallel=3
+      
+      - name: Validate affected projects
+        run: npm run affected:validate -- --parallel=3
