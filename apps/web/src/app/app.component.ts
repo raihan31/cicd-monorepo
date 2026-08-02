@@ -16,7 +16,6 @@ export class AppComponent implements OnInit {
   readonly products = signal<Product[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  const invalidNumber: number = "invalid";
   ngOnInit(): void {
     this.productsService.getProducts().subscribe({
       next: ({ products }) => {
