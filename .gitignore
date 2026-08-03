@@ -13,3 +13,7 @@ coverage/
 .github/skills
 .idea
 test-results
+.codex
+.opencode
+opencode.json
+.agents

@@ -22,6 +22,8 @@ describe('ProductsService', () => {
     httpTestingController.verify();
   });
 
+  
+
   it('should request products from the API', () => {
     const response: ProductsResponse = {
       products: [
