@@ -73,13 +73,31 @@ jobs:
       - name: Set Nx comparison SHAs
         uses: nrwl/nx-set-shas@v4
 
-      - name: Test affected projects
+      - name: Test affected projects with coverage
         run: >
           npx nx affected
           -t test
-          --parallel=3
-          --configuration=ci
+          --coverage
+          --ci
+          --runInBand
 
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.sha }}
+          path: test-results
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-${{ github.sha }}
+          path: coverage
+          if-no-files-found: warn
+          retention-days: 7
   build:
     name: Build affected projects
     runs-on: ubuntu-latest

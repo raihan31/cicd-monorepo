@@ -15,4 +15,31 @@ export default {
     'jest-preset-angular/build/serializers/ng-snapshot',
     'jest-preset-angular/build/serializers/html-comment',
   ],
+  coverageReporters: ['text', 'html', 'lcov', 'cobertura'],
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 60,
+      lines: 70,
+      statements: 70,
+    },
+  },
+  collectCoverageFrom: [
+    'src/app/**/*.ts',
+    '!src/**/*.spec.ts',
+    '!src/main.ts',
+    '!src/app/app.config.ts',
+    '!src/app/app.routes.ts',
+  ],
+  reporters: [
+    'default',
+    [
+      'jest-junit',
+      {
+        outputDirectory: '<rootDir>/../../test-results/web',
+        outputName: 'junit.xml',
+        suiteName: 'web',
+      },
+    ],
+  ],
 };
