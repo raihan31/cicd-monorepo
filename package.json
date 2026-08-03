@@ -19,7 +19,11 @@
     "affected:lint": "nx affected -t lint",
     "affected:test": "nx affected -t test",
     "affected:build": "nx affected -t build",
-    "affected:validate": "nx affected -t lint test build"
+    "affected:validate": "nx affected -t lint test build",
+    "test:coverage": "nx run-many -t test --coverage",
+    "test:coverage:web": "nx test web --coverage",
+    "test:coverage:api": "nx test api --coverage",
+    "affected:test:coverage": "nx affected -t test --coverage"
   },
   "dependencies": {
     "@angular/common": "^22.0.8",
@@ -63,6 +67,7 @@
     "jest": "^30.0.4",
     "jest-environment-jsdom": "^30.0.4",
     "jest-environment-node": "^30.0.4",
+    "jest-junit": "^17.0.0",
     "jest-preset-angular": "^17.0.0",
     "nx": "23.1.0",
     "prettier": "^3.6.2",
