@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Nx output and cache
+dist
+.nx
+coverage
+test-results
+
+# Git
+.git
+.github
+
+# IDE and OS files
+.idea
+.vscode
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Documentation and temporary files
+tmp
+temp
+*.zip
