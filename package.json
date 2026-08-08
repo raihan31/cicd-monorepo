@@ -23,7 +23,14 @@
     "test:coverage": "nx run-many -t test --coverage",
     "test:coverage:web": "nx test web --coverage",
     "test:coverage:api": "nx test api --coverage",
-    "affected:test:coverage": "nx affected -t test --coverage"
+    "affected:test:coverage": "nx affected -t test --coverage",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up --build",
+    "docker:up:detached": "docker compose up --build --detach",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs --follow",
+    "docker:ps": "docker compose ps",
+    "docker:test": "npm run docker:up:detached && node scripts/test-containers.mjs"
   },
   "dependencies": {
     "@angular/common": "^22.0.8",
