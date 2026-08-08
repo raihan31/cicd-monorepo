@@ -79,13 +79,13 @@ jobs:
 
       - name: Smoke test containers
         run: |
-          curl --fail --retry 20 --retry-delay 2 \
+          curl --fail --retry 20 --retry-delay 2 --retry-all-errors \
             http://localhost:8080/health
 
-          curl --fail --retry 20 --retry-delay 2 \
+          curl --fail --retry 20 --retry-delay 2 --retry-all-errors \
             http://localhost:8080/api/health
 
-          curl --fail --retry 20 --retry-delay 2 \
+          curl --fail --retry 20 --retry-delay 2 --retry-all-errors \
             http://localhost:8080/api/products
 
       - name: Show container logs
