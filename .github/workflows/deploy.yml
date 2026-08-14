@@ -1,0 +1,105 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: Git SHA of the images to deploy
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  prepare:
+    name: Prepare deployment
+    runs-on: ubuntu-latest
+
+    outputs:
+      web-image: ${{ steps.images.outputs.web-image }}
+      api-image: ${{ steps.images.outputs.api-image }}
+
+    steps:
+      - name: Resolve image references
+        id: images
+        shell: bash
+        run: |
+          echo \
+            "web-image=ghcr.io/raihan31/cicd-web:sha-${{ inputs.image_sha }}" \
+            >> "$GITHUB_OUTPUT"
+
+          echo \
+            "api-image=ghcr.io/raihan31/cicd-api:sha-${{ inputs.image_sha }}" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Show deployment artifacts
+        run: |
+          echo "WEB:"
+          echo "${{ steps.images.outputs.web-image }}"
+
+          echo "API:"
+          echo "${{ steps.images.outputs.api-image }}"
+
+  deploy-development:
+    name: Deploy development
+
+    needs:
+      - prepare
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: development
+
+    steps:
+      - name: Show development artifact
+        run: |
+          echo "Deploying WEB:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+
+          echo "Deploying API:"
+          echo "${{ needs.prepare.outputs.api-image }}"
+          
+  deploy-staging:
+    name: Deploy staging
+
+    needs:
+      - prepare
+      - deploy-development
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: staging
+
+    steps:
+      - name: Show staging artifact
+        run: |
+          echo "Promoting WEB:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+
+          echo "Promoting API:"
+          echo "${{ needs.prepare.outputs.api-image }}"
+          
+  deploy-production:
+    name: Deploy production
+
+    needs:
+      - prepare
+      - deploy-staging
+
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+
+    steps:
+      - name: Show production artifact
+        run: |
+          echo "Promoting WEB:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+
+          echo "Promoting API:"
+          echo "${{ needs.prepare.outputs.api-image }}"
