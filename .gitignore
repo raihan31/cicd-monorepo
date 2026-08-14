@@ -4,6 +4,8 @@ coverage/
 .nx/
 .angular/
 .env
+.env.*
+!.env.example
 .DS_Store
 
 .claude/worktrees
