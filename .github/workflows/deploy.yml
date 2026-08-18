@@ -12,11 +12,20 @@ permissions:
   contents: read
   packages: read
 
+concurrency:
+    group: deployment-${{ inputs.image_sha }}
+    cancel-in-progress: false
+
+env:
+    REGISTRY: ghcr.io
+    OWNER: ${{ github.repository_owner }}
+    WEB_IMAGE: cicd-web
+    API_IMAGE: cicd-api
+
 jobs:
   prepare:
-    name: Prepare deployment
+    name: Resolve deployment artifacts
     runs-on: ubuntu-latest
-
     outputs:
       web-image: ${{ steps.images.outputs.web-image }}
       api-image: ${{ steps.images.outputs.api-image }}
@@ -27,11 +36,11 @@ jobs:
         shell: bash
         run: |
           echo \
-            "web-image=ghcr.io/raihan31/cicd-web:sha-${{ inputs.image_sha }}" \
+            "web-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEB_IMAGE }}:sha-${{ inputs.image_sha }}" \
             >> "$GITHUB_OUTPUT"
 
           echo \
-            "api-image=ghcr.io/raihan31/cicd-api:sha-${{ inputs.image_sha }}" \
+            "api-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.API_IMAGE }}:sha-${{ inputs.image_sha }}" \
             >> "$GITHUB_OUTPUT"
 
       - name: Show deployment artifacts
@@ -42,47 +51,98 @@ jobs:
           echo "API:"
           echo "${{ steps.images.outputs.api-image }}"
 
+
+
   deploy-development:
     name: Deploy development
-
     needs:
       - prepare
-
     runs-on: ubuntu-latest
-
     environment:
       name: development
-
     steps:
+      - name: Show environment
+        run: |
+          echo "Environment:"
+          echo "${{ vars.APP_ENV }}"
+
       - name: Show development artifact
         run: |
           echo "Deploying WEB:"
           echo "${{ needs.prepare.outputs.web-image }}"
-
           echo "Deploying API:"
           echo "${{ needs.prepare.outputs.api-image }}"
+
+      - name: Deploy to development
+        run: |
+          echo "Deploying To development environment..."
           
+
+
+
+  verify-development:
+    name: Verify development
+    needs:
+      - deploy-development
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+    steps:
+      - name: Verify deployment
+        run: |
+          echo "Environment:"
+          echo "${{ vars.APP_ENV }}"
+          echo "Verifying deployment to development environment..."
+          
+
+
   deploy-staging:
     name: Deploy staging
-
     needs:
       - prepare
-      - deploy-development
-
+      - verify-development
     runs-on: ubuntu-latest
 
     environment:
       name: staging
 
     steps:
+      - name: Show environment
+        run: |
+          echo "Environment:"
+          echo "${{ vars.APP_ENV }}"
+
+
       - name: Show staging artifact
         run: |
           echo "Promoting WEB:"
           echo "${{ needs.prepare.outputs.web-image }}"
-
           echo "Promoting API:"
           echo "${{ needs.prepare.outputs.api-image }}"
           
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying To staging environment..."
+          
+
+  verify-staging:
+    name: Verify staging
+    needs:
+      - deploy-staging
+    runs-on: ubuntu-latest
+
+    environment:
+      name: staging
+
+    steps:
+      - name: Verify deployment
+        run: |
+          echo "Environment:"
+          echo "${{ vars.APP_ENV }}"
+          echo "Verifying deployment to staging environment..."
+
+
   deploy-production:
     name: Deploy production
 
@@ -103,3 +163,25 @@ jobs:
 
           echo "Promoting API:"
           echo "${{ needs.prepare.outputs.api-image }}"
+      - name: Deploy to production
+        run: |
+          echo "Deploying To production environment..."
+          
+          
+          
+
+  verify-production:
+    name: Verify production
+    needs:
+      - deploy-production
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+
+    steps:
+      - name: Verify deployment
+        run: |
+          echo "Environment:"
+          echo "${{ vars.APP_ENV }}"
+          echo "Verifying deployment to production environment..."
