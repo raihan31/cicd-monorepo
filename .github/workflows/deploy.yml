@@ -148,7 +148,7 @@ jobs:
 
     needs:
       - prepare
-      - deploy-staging
+      - verify-staging
 
     runs-on: ubuntu-latest
 
