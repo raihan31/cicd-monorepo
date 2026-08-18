@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+
   push:
     branches:
       - main
@@ -55,7 +56,6 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}
-
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -65,14 +65,12 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-
       - name: Extract API metadata
         id: meta-api
         uses: docker/metadata-action@v6
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
-
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -88,14 +86,10 @@ jobs:
         with:
           context: .
           file: apps/web/Dockerfile
-
           platforms: linux/amd64,linux/arm64
-
           push: ${{ github.event_name != 'pull_request' }}
-
           tags: ${{ steps.meta-web.outputs.tags }}
           labels: ${{ steps.meta-web.outputs.labels }}
-
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
@@ -104,13 +98,9 @@ jobs:
         with:
           context: .
           file: apps/api/Dockerfile
-
           platforms: linux/amd64,linux/arm64
-
           push: ${{ github.event_name != 'pull_request' }}
-
           tags: ${{ steps.meta-api.outputs.tags }}
           labels: ${{ steps.meta-api.outputs.labels }}
-
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api

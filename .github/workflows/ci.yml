@@ -50,6 +50,9 @@ jobs:
 
       - name: Lint affected projects
         run: npx nx affected -t lint --parallel=3
+
+
+
   test:
     name: Test affected projects
     runs-on: ubuntu-latest
@@ -98,6 +101,9 @@ jobs:
           path: coverage
           if-no-files-found: warn
           retention-days: 7
+
+
+
   build:
     name: Build affected projects
     runs-on: ubuntu-latest
@@ -129,6 +135,7 @@ jobs:
           echo "Generated build files:"
           find dist -maxdepth 4 -type f | head -100
 
+
       - name: Upload Angular build
         uses: actions/upload-artifact@v4
         with:
@@ -144,6 +151,9 @@ jobs:
           path: dist/apps/api
           if-no-files-found: warn
           retention-days: 7
+
+
+
   quality-gate:
     name: CI quality gate
     runs-on: ubuntu-latest
