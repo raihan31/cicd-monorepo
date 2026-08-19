@@ -1,6 +1,14 @@
-name: Deploy
+name: deploy
 
 on:
+  workflow_run:
+    workflows:
+      - docker-publish
+    types:
+      - completed
+    branches:
+      - main
+
   workflow_dispatch:
     inputs:
       image_sha:
@@ -13,8 +21,8 @@ permissions:
   packages: read
 
 concurrency:
-    group: deployment-${{ inputs.image_sha }}
-    cancel-in-progress: false
+    group: deployment-${{ github.event.workflow_run.head_sha }}
+    cancel-in-progress: true
 
 env:
     REGISTRY: ghcr.io
@@ -26,25 +34,46 @@ jobs:
   prepare:
     name: Resolve deployment artifacts
     runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event_name == 'workflow_dispatch'
+
     outputs:
+      image-sha: ${{ steps.resolve_sha.outputs.image_sha }}
       web-image: ${{ steps.images.outputs.web-image }}
       api-image: ${{ steps.images.outputs.api-image }}
 
     steps:
       - name: Resolve image references
+        id: resolve_sha
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+              IMAGE_SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+              IMAGE_SHA="${{ inputs.image_sha }}"
+          fi
+          echo "Using image SHA: ${IMAGE_SHA}"
+          echo "image-sha=${IMAGE_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image references
         id: images
         shell: bash
         run: |
+          IMAGE_SHA="${{ steps.resolve_sha.outputs.image_sha }}"
           echo \
-            "web-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEB_IMAGE }}:sha-${{ inputs.image_sha }}" \
+            "web-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEB_IMAGE }}:sha-${IMAGE_SHA}" \
             >> "$GITHUB_OUTPUT"
 
           echo \
-            "api-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.API_IMAGE }}:sha-${{ inputs.image_sha }}" \
+            "api-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.API_IMAGE }}:sha-${IMAGE_SHA}" \
             >> "$GITHUB_OUTPUT"
 
       - name: Show deployment artifacts
         run: |
+          echo "Image SHA:"
+          echo "${{ steps.resolve_image_ref.image_sha }}"
+          
           echo "WEB:"
           echo "${{ steps.images.outputs.web-image }}"
 
@@ -60,6 +89,11 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: development
+
+    concurrency:
+      group: development-${{ needs.prepare.outputs.image-sha }}
+      cancel-in-progress: true
+
     steps:
       - name: Show environment
         run: |
@@ -68,6 +102,8 @@ jobs:
 
       - name: Show development artifact
         run: |
+          echo "Image SHA:"
+          echo "${{ needs.prepare.outputs.image-sha }}"
           echo "Deploying WEB:"
           echo "${{ needs.prepare.outputs.web-image }}"
           echo "Deploying API:"
@@ -76,8 +112,6 @@ jobs:
       - name: Deploy to development
         run: |
           echo "Deploying To development environment..."
-          
-
 
 
   verify-development:
@@ -88,16 +122,21 @@ jobs:
     environment:
       name: development
     steps:
-      - name: Verify deployment
+      - name: Verify artifact identity
         run: |
+          echo "Verifying:"
+          echo "${{ needs.prepare.outputs.image-sha }}"
           echo "Environment:"
           echo "${{ vars.APP_ENV }}"
           echo "Verifying deployment to development environment..."
-          
-
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests against development environment..."
 
   deploy-staging:
     name: Deploy staging
+    if: |
+        github.event_name == 'workflow_dispatch'
     needs:
       - prepare
       - verify-development
@@ -115,6 +154,8 @@ jobs:
 
       - name: Show staging artifact
         run: |
+          echo "Image SHA:"
+          echo "${{ needs.prepare.outputs.image-sha }}"
           echo "Promoting WEB:"
           echo "${{ needs.prepare.outputs.web-image }}"
           echo "Promoting API:"
@@ -145,6 +186,9 @@ jobs:
 
   deploy-production:
     name: Deploy production
+
+    if:
+      github.event_name == 'workflow_dispatch'
 
     needs:
       - prepare
