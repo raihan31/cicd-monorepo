@@ -39,9 +39,9 @@ jobs:
       github.event_name == 'workflow_dispatch'
 
     outputs:
-      image-sha: ${{ steps.resolve_sha.outputs.image-sha }}
-      web-image: ${{ steps.images.outputs.web-image }}
-      api-image: ${{ steps.images.outputs.api-image }}
+      image_sha: ${{ steps.resolve_sha.outputs.image_sha }}
+      web_image: ${{ steps.images.outputs.web_image }}
+      api_image: ${{ steps.images.outputs.api_image }}
 
     steps:
       - name: Resolve image references
@@ -55,31 +55,31 @@ jobs:
           fi
           SHORT_SHA="${FULL_SHA:0:7}"
           echo "Using image SHA: $SHORT_SHA"
-          echo "image-sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "image_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Resolve image references
         id: images
         shell: bash
         run: |
-          IMAGE_SHA="${{ steps.resolve_sha.outputs.image-sha }}"
+          IMAGE_SHA="${{ steps.resolve_sha.outputs.image_sha }}"
           echo \
-            "web-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEB_IMAGE }}:sha-${{IMAGE_SHA}}" \
+            "web_image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEB_IMAGE }}:sha-${IMAGE_SHA}" \
             >> "$GITHUB_OUTPUT"
 
           echo \
-            "api-image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.API_IMAGE }}:sha-${{IMAGE_SHA}}" \
+            "api_image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.API_IMAGE }}:sha-${IMAGE_SHA}" \
             >> "$GITHUB_OUTPUT"
 
       - name: Show deployment artifacts
         run: |
           echo "Image SHA:"
-          echo "${{ steps.resolve_sha.outputs.image-sha }}"
+          echo "${{ steps.resolve_sha.outputs.image_sha }}"
           
           echo "WEB:"
-          echo "${{ steps.images.outputs.web-image }}"
+          echo "${{ steps.images.outputs.web_image }}"
 
           echo "API:"
-          echo "${{ steps.images.outputs.api-image }}"
+          echo "${{ steps.images.outputs.api_image }}"
 
 
 
@@ -92,7 +92,7 @@ jobs:
       name: development
 
     concurrency:
-      group: development-${{ needs.prepare.outputs.image-sha }}
+      group: development-${{ needs.prepare.outputs.image_sha }}
       cancel-in-progress: true
 
     steps:
@@ -104,11 +104,11 @@ jobs:
       - name: Show development artifact
         run: |
           echo "Image SHA:"
-          echo "${{ needs.prepare.outputs.image-sha }}"
+          echo "${{ needs.prepare.outputs.image_sha }}"
           echo "Deploying WEB:"
-          echo "${{ needs.prepare.outputs.web-image }}"
+          echo "${{ needs.prepare.outputs.web_image }}"
           echo "Deploying API:"
-          echo "${{ needs.prepare.outputs.api-image }}"
+          echo "${{ needs.prepare.outputs.api_image }}"
 
       - name: Deploy to development
         run: |
@@ -154,11 +154,11 @@ jobs:
       - name: Show staging artifact
         run: |
           echo "Image SHA:"
-          echo "${{ needs.prepare.outputs.image-sha }}"
+          echo "${{ needs.prepare.outputs.image_sha }}"
           echo "Promoting WEB:"
-          echo "${{ needs.prepare.outputs.web-image }}"
+          echo "${{ needs.prepare.outputs.web_image }}"
           echo "Promoting API:"
-          echo "${{ needs.prepare.outputs.api-image }}"
+          echo "${{ needs.prepare.outputs.api_image }}"
           
 
       - name: Deploy to staging
@@ -202,10 +202,10 @@ jobs:
       - name: Show production artifact
         run: |
           echo "Promoting WEB:"
-          echo "${{ needs.prepare.outputs.web-image }}"
+          echo "${{ needs.prepare.outputs.web_image }}"
 
           echo "Promoting API:"
-          echo "${{ needs.prepare.outputs.api-image }}"
+          echo "${{ needs.prepare.outputs.api_image }}"
       - name: Deploy to production
         run: |
           echo "Deploying To production environment..."
