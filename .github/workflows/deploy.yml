@@ -1,4 +1,4 @@
-name: deploy
+name: Deploy
 
 on:
   workflow_run:
@@ -20,174 +20,246 @@ permissions:
   contents: read
   packages: read
 
-concurrency:
-    group: deployment-${{ github.event.workflow_run.head_sha }}
-    cancel-in-progress: true
-
-env:
-    REGISTRY: ghcr.io
-    OWNER: ${{ github.repository_owner }}
-    WEB_IMAGE: cicd-web
-    API_IMAGE: cicd-api
-
 jobs:
+  # ---------------------------------------------------------
+  # 1. Resolve the artifact that will move through environments
+  # ---------------------------------------------------------
   prepare:
-    name: Resolve deployment artifacts
-    runs-on: ubuntu-latest
+    name: Resolve deployment artifact
+
     if: >
-      github.event.workflow_run.conclusion == 'success' ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    runs-on: ubuntu-latest
 
     outputs:
-      image_sha: ${{ steps.resolve_sha.outputs.image_sha }}
-      web_image: ${{ steps.images.outputs.web_image }}
-      api_image: ${{ steps.images.outputs.api_image }}
+      full-sha: ${{ steps.resolve-sha.outputs.full-sha }}
+      image-sha: ${{ steps.resolve-sha.outputs.image-sha }}
+      web-image: ${{ steps.images.outputs.web-image }}
+      api-image: ${{ steps.images.outputs.api-image }}
 
     steps:
-      - name: Resolve image references
-        id: resolve_sha
+      - name: Resolve image SHA
+        id: resolve-sha
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-              FULL_SHA="${{ github.event.workflow_run.head_sha }}"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            FULL_SHA="${{ github.event.workflow_run.head_sha }}"
           else
-              FULL_SHA="${{ inputs.image_sha }}"
+            FULL_SHA="${{ inputs.image_sha }}"
           fi
-          SHORT_SHA="${FULL_SHA:0:7}"
-          echo "Using image SHA: $SHORT_SHA"
-          echo "image_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+          # Our Docker metadata SHA tag uses the short Git SHA.
+          IMAGE_SHA="${FULL_SHA:0:7}"
+
+          echo "Full Git SHA: ${FULL_SHA}"
+          echo "Image SHA tag: ${IMAGE_SHA}"
+
+          echo "full-sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image-sha=${IMAGE_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve image references
         id: images
         shell: bash
         run: |
-          IMAGE_SHA="${{ steps.resolve_sha.outputs.image_sha }}"
-          echo \
-            "web_image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.WEB_IMAGE }}:sha-${IMAGE_SHA}" \
-            >> "$GITHUB_OUTPUT"
+          IMAGE_SHA="${{ steps.resolve-sha.outputs.image-sha }}"
 
-          echo \
-            "api_image=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.API_IMAGE }}:sha-${IMAGE_SHA}" \
-            >> "$GITHUB_OUTPUT"
+          WEB_IMAGE="ghcr.io/raihan31/cicd-web:sha-${IMAGE_SHA}"
+          API_IMAGE="ghcr.io/raihan31/cicd-api:sha-${IMAGE_SHA}"
+
+          echo "web-image=${WEB_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "api-image=${API_IMAGE}" >> "$GITHUB_OUTPUT"
 
       - name: Show deployment artifacts
         run: |
+          echo "Full SHA:"
+          echo "${{ steps.resolve-sha.outputs.full-sha }}"
+
           echo "Image SHA:"
-          echo "${{ steps.resolve_sha.outputs.image_sha }}"
-          
+          echo "${{ steps.resolve-sha.outputs.image-sha }}"
+
           echo "WEB:"
-          echo "${{ steps.images.outputs.web_image }}"
+          echo "${{ steps.images.outputs.web-image }}"
 
           echo "API:"
-          echo "${{ steps.images.outputs.api_image }}"
+          echo "${{ steps.images.outputs.api-image }}"
 
-
-
+  # ---------------------------------------------------------
+  # 2. Development
+  # ---------------------------------------------------------
   deploy-development:
     name: Deploy development
+
     needs:
       - prepare
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
     environment:
       name: development
 
     concurrency:
-      group: development-${{ needs.prepare.outputs.image_sha }}
+      group: development
       cancel-in-progress: true
 
     steps:
-      - name: Show environment
+      - name: Show development environment
         run: |
-          echo "Environment:"
-          echo "${{ vars.APP_ENV }}"
+          echo "APP_ENV=${{ vars.APP_ENV }}"
 
       - name: Show development artifact
         run: |
-          echo "Image SHA:"
-          echo "${{ needs.prepare.outputs.image_sha }}"
-          echo "Deploying WEB:"
-          echo "${{ needs.prepare.outputs.web_image }}"
-          echo "Deploying API:"
-          echo "${{ needs.prepare.outputs.api_image }}"
+          echo "WEB_IMAGE=${{ needs.prepare.outputs.web-image }}"
+          echo "API_IMAGE=${{ needs.prepare.outputs.api-image }}"
 
-      - name: Deploy to development
+      - name: Deploy development
         run: |
-          echo "Deploying To development environment..."
-
+          echo "TODO: Replace this with the real development deployment command."
+          echo "Deploying:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+          echo "${{ needs.prepare.outputs.api-image }}"
 
   verify-development:
     name: Verify development
+
     needs:
+      - prepare
       - deploy-development
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
     environment:
       name: development
-    steps:
-      - name: Verify artifact identity
-        run: |
-          echo "Environment:"
-          echo "${{ vars.APP_ENV }}"
-          echo "Verifying deployment to development environment..."
-      - name: Run smoke tests
-        run: |
-          echo "Running smoke tests against development environment..."
 
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify development deployment
+        env:
+          APP_ENV: development
+          WEB_URL: ${{ vars.WEB_URL }}
+          API_URL: ${{ vars.API_URL }}
+        run: node scripts/verify-deployment.mjs
+
+      - name: Verification diagnostics
+        if: failure()
+        run: |
+          echo "Development verification failed."
+          echo "WEB_URL=${{ vars.WEB_URL }}"
+          echo "API_URL=${{ vars.API_URL }}"
+
+      - name: Write verification summary
+        if: success()
+        run: |
+          echo "### Development Verification ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: development" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image SHA: ${{ needs.prepare.outputs.image-sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- WEB_URL: ${{ vars.WEB_URL }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API_URL: ${{ vars.API_URL }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------
+  # 3. Staging
+  # ---------------------------------------------------------
   deploy-staging:
     name: Deploy staging
-    if: |
-        github.event_name == 'workflow_dispatch'
+
     needs:
       - prepare
       - verify-development
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 10
 
     environment:
       name: staging
 
+    concurrency:
+      group: staging
+      cancel-in-progress: false
+
     steps:
-      - name: Show environment
+      - name: Show staging environment
         run: |
-          echo "Environment:"
-          echo "${{ vars.APP_ENV }}"
+          echo "APP_ENV=${{ vars.APP_ENV }}"
 
-
-      - name: Show staging artifact
+      - name: Show promoted artifact
         run: |
-          echo "Image SHA:"
-          echo "${{ needs.prepare.outputs.image_sha }}"
-          echo "Promoting WEB:"
-          echo "${{ needs.prepare.outputs.web_image }}"
-          echo "Promoting API:"
-          echo "${{ needs.prepare.outputs.api_image }}"
-          
+          echo "WEB_IMAGE=${{ needs.prepare.outputs.web-image }}"
+          echo "API_IMAGE=${{ needs.prepare.outputs.api-image }}"
 
-      - name: Deploy to staging
+      - name: Deploy staging
         run: |
-          echo "Deploying To staging environment..."
-          
+          echo "TODO: Replace this with the real staging deployment command."
+          echo "Promoting the development-tested artifact:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+          echo "${{ needs.prepare.outputs.api-image }}"
 
   verify-staging:
     name: Verify staging
+
     needs:
+      - prepare
       - deploy-staging
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 10
 
     environment:
       name: staging
 
     steps:
-      - name: Verify deployment
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify staging deployment
+        env:
+          APP_ENV: staging
+          WEB_URL: ${{ vars.WEB_URL }}
+          API_URL: ${{ vars.API_URL }}
+        run: node scripts/verify-deployment.mjs
+
+      - name: Verification diagnostics
+        if: failure()
         run: |
-          echo "Environment:"
-          echo "${{ vars.APP_ENV }}"
-          echo "Verifying deployment to staging environment..."
+          echo "Staging verification failed."
+          echo "WEB_URL=${{ vars.WEB_URL }}"
+          echo "API_URL=${{ vars.API_URL }}"
 
+      - name: Write verification summary
+        if: success()
+        run: |
+          echo "### Staging Verification ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image SHA: ${{ needs.prepare.outputs.image-sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- WEB_URL: ${{ vars.WEB_URL }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API_URL: ${{ vars.API_URL }}" >> "$GITHUB_STEP_SUMMARY"
 
+  # ---------------------------------------------------------
+  # 4. Production
+  # GitHub Environment protection provides the approval gate.
+  # ---------------------------------------------------------
   deploy-production:
     name: Deploy production
-
-    if:
-      github.event_name == 'workflow_dispatch'
 
     needs:
       - prepare
@@ -195,36 +267,244 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    timeout-minutes: 10
+
     environment:
       name: production
 
+    concurrency:
+      group: production
+      cancel-in-progress: false
+
+    outputs:
+      previous-web-image: ${{ steps.previous.outputs.web }}
+      previous-api-image: ${{ steps.previous.outputs.api }}
+
     steps:
-      - name: Show production artifact
+      - name: Capture previous production images
+        id: previous
+        shell: bash
         run: |
-          echo "Promoting WEB:"
-          echo "${{ needs.prepare.outputs.web_image }}"
+          echo "Previous WEB:"
+          echo "${{ vars.CURRENT_WEB_IMAGE }}"
 
-          echo "Promoting API:"
-          echo "${{ needs.prepare.outputs.api_image }}"
-      - name: Deploy to production
+          echo "Previous API:"
+          echo "${{ vars.CURRENT_API_IMAGE }}"
+
+          echo "web=${{ vars.CURRENT_WEB_IMAGE }}" >> "$GITHUB_OUTPUT"
+          echo "api=${{ vars.CURRENT_API_IMAGE }}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify production eligibility
+        shell: bash
         run: |
-          echo "Deploying To production environment..."
-          
-          
-          
+          IMAGE_SHA="${{ needs.prepare.outputs.image-sha }}"
 
+          if [ -z "${IMAGE_SHA}" ]; then
+            echo "Image SHA is missing."
+            exit 1
+          fi
+
+          echo "Artifact is eligible for production."
+
+      - name: Show release metadata
+        run: |
+          echo "Git SHA:"
+          echo "${{ needs.prepare.outputs.full-sha }}"
+
+          echo "Image SHA:"
+          echo "${{ needs.prepare.outputs.image-sha }}"
+
+          echo "Triggered by:"
+          echo "${{ github.actor }}"
+
+          echo "Workflow run:"
+          echo "${{ github.run_id }}"
+
+      - name: Show approved production artifact
+        run: |
+          echo "WEB:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+
+          echo "API:"
+          echo "${{ needs.prepare.outputs.api-image }}"
+
+      - name: Deploy production
+        run: |
+          echo "TODO: Replace this with the real production deployment command."
+          echo "Deploying approved staging-tested artifact:"
+          echo "${{ needs.prepare.outputs.web-image }}"
+          echo "${{ needs.prepare.outputs.api-image }}"
+
+      - name: Deployment summary
+        run: |
+          echo "### Production Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA: ${{ needs.prepare.outputs.image-sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Triggered by: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------
+  # 5. Verify production
+  # ---------------------------------------------------------
   verify-production:
     name: Verify production
+
     needs:
+      - prepare
       - deploy-production
+
     runs-on: ubuntu-latest
+
+    timeout-minutes: 10
 
     environment:
       name: production
 
     steps:
-      - name: Verify deployment
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify production deployment
+        env:
+          APP_ENV: production
+          WEB_URL: ${{ vars.WEB_URL }}
+          API_URL: ${{ vars.API_URL }}
+        run: node scripts/verify-deployment.mjs
+
+      - name: Verification diagnostics
+        if: failure()
         run: |
-          echo "Environment:"
-          echo "${{ vars.APP_ENV }}"
-          echo "Verifying deployment to production environment..."
+          echo "Production verification failed."
+          echo "WEB_URL=${{ vars.WEB_URL }}"
+          echo "API_URL=${{ vars.API_URL }}"
+
+      - name: Write verification summary
+        if: success()
+        run: |
+          echo "### Production Verification ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image SHA: ${{ needs.prepare.outputs.image-sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- WEB_URL: ${{ vars.WEB_URL }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API_URL: ${{ vars.API_URL }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------
+  # 6. Roll back if production verification fails
+  # ---------------------------------------------------------
+  rollback-production:
+    name: Roll back production
+
+    if: >
+      always() &&
+      needs.deploy-production.result == 'success' &&
+      needs.verify-production.result == 'failure'
+
+    needs:
+      - prepare
+      - deploy-production
+      - verify-production
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    environment:
+      name: production
+
+    concurrency:
+      group: production
+      cancel-in-progress: false
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Record rollback reason
+        run: |
+          echo "### Production Rollback Triggered ⚠️" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Failed SHA: ${{ needs.prepare.outputs.image-sha }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Previous WEB: ${{ needs.deploy-production.outputs.previous-web-image }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Previous API: ${{ needs.deploy-production.outputs.previous-api-image }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate rollback target
+        shell: bash
+        run: |
+          WEB_IMAGE="${{ needs.deploy-production.outputs.previous-web-image }}"
+          API_IMAGE="${{ needs.deploy-production.outputs.previous-api-image }}"
+
+          if [ -z "${WEB_IMAGE}" ]; then
+            echo "Previous WEB image is missing."
+            exit 1
+          fi
+
+          if [ -z "${API_IMAGE}" ]; then
+            echo "Previous API image is missing."
+            exit 1
+          fi
+
+      - name: Roll back production
+        env:
+          APP_ENV: production
+          WEB_IMAGE: ${{ needs.deploy-production.outputs.previous-web-image }}
+          API_IMAGE: ${{ needs.deploy-production.outputs.previous-api-image }}
+        run: node scripts/rollback-deployment.mjs
+
+  # ---------------------------------------------------------
+  # 7. Verify rollback
+  # ---------------------------------------------------------
+  verify-rollback:
+    name: Verify production rollback
+
+    if: >
+      always() &&
+      needs.rollback-production.result == 'success'
+
+    needs:
+      - rollback-production
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    environment:
+      name: production
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify restored production
+        env:
+          APP_ENV: production
+          WEB_URL: ${{ vars.WEB_URL }}
+          API_URL: ${{ vars.API_URL }}
+        run: node scripts/verify-deployment.mjs
+
+      - name: Rollback summary
+        if: success()
+        run: |
+          echo "### Production Rollback Verified ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Previous known-good production artifact was restored successfully." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rollback failure warning
+        if: failure()
+        run: |
+          echo "### Production Incident 🚨" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The rollback completed, but production verification also failed." >> "$GITHUB_STEP_SUMMARY"
+          echo "Human intervention is required." >> "$GITHUB_STEP_SUMMARY"
