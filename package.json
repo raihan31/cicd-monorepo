@@ -36,7 +36,8 @@
     "deploy:staging": "docker compose -f deployment/staging/compose.yaml up -d",
     "deploy:staging:down": "docker compose -f deployment/staging/compose.yaml down",
     "verify:dev": "APP_ENV=development node scripts/verify-deployment.mjs",
-    "verify:staging": "APP_ENV=staging node scripts/verify-deployment.mjs"
+    "verify:production": "APP_ENV=production node scripts/verify-deployment.mjs",
+    "rollback:production": "APP_ENV=production node scripts/rollback-deployment.mjs"
   },
   "dependencies": {
     "@angular/common": "^22.0.8",
